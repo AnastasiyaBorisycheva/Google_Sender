@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+.env
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+.DS_Store
+
+# Логи и данные
+*.log
+*.sqlite
+*.db
+state.json
+last_value.txt
+
+# Секретные файлы
+credentials.json
+*.key
+*.pem
+secrets/
+.env.local
+.env.*.local
+
+# Дистрибуции
+dist/
+build/
+*.egg-info/
+
+# Тесты
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Операционные системы
+Thumbs.db
