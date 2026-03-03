@@ -57,7 +57,10 @@ def setup_logger(
 
 
 # Глобальный логгер для импорта
-logger = setup_logger()
+logger = setup_logger(
+    level='DEBUG',
+    log_file='debug.log'
+)
 
 
 if __name__ == "__main__":
