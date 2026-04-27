@@ -5,7 +5,7 @@
 import json
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 
 class Settings(BaseSettings):
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True,  # имена переменных чувствительны к регистру
+        case_sensitive=False,  # имена переменных чувствительны к регистру
         extra="ignore",  # игнорировать лишние поля в .env
     )
 
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
         Преобразует строку из .env в список int.
         Пример: "[595921273, 111, 222]" → [595921273, 111, 222]
         """
+
         # Если уже список, возвращаем как есть
         if isinstance(v, list):
             return v
@@ -56,22 +57,18 @@ class Settings(BaseSettings):
             except json.JSONDecodeError:
                 pass
 
-        # Если ничего не подошло, возвращаем пустой список
         return []
 
-    @field_validator("ADMIN_USER_ID", mode="after")
-    @classmethod
-    def validate_admin_in_users(cls, v, info):
-        """
-        Проверяет, что ADMIN_USER_ID есть в списке USERS_IDS
-        """
-        users_ids = info.data.get("USERS_IDS", [])
-        if v not in users_ids:
-            # Можно добавить админа в список автоматически
-            # Но лучше предупредить
-            print(f"ВНИМАНИЕ: ADMIN_USER_ID={v} отсутствует в USERS_IDS")
-            print(f"Добавьте его вручную в .env: USERS_IDS=[{v}, ...]")
-        return v
+    @model_validator(mode="after")
+    def validate_admin_in_users(self) -> "Settings":
+        """Проверяет, что ADMIN_USER_ID есть в списке USERS_IDS"""
+        if self.ADMIN_USER_ID not in self.USERS_IDS:
+            print(
+                f"ВНИМАНИЕ: ADMIN_USER_ID={self.ADMIN_USER_ID} отсутствует в USERS_IDS"
+            )
+            print(f"Добавьте его вручную в .env: USERS_IDS=[{self.ADMIN_USER_ID}, ...]")
+            print(f"Пока что админ не будет получать уведомления через notifier")
+        return self
 
 
 def load_config() -> Settings:
