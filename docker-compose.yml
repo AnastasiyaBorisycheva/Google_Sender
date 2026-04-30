@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: headache-diary-bot
+    restart: always
+    volumes:
+      - ./storage:/app/storage  # сохраняем state.json между перезапусками
+    env_file:
+      - .env
