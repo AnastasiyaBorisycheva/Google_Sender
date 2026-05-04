@@ -37,3 +37,13 @@ jobs:
           docker-compose pull
           docker-compose up -d
           docker system prune -f
+
+    - name: Inform User via Telegram
+      uses: appleboy/telegram-action@master
+      with:
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        disable_notification: true
+        message: |
+          "Deployment successful!
+          The headache diary bot has been updated and is now running with the latest changes."
