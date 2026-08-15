@@ -48,3 +48,6 @@ htmlcov/
 
 # Операционные системы
 Thumbs.db
+
+
+test_db.py
