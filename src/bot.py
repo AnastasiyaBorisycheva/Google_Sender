@@ -3,9 +3,13 @@ from datetime import datetime
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import config
+from src.database.crud import add_headache_record, get_or_create_user
+from src.database.engine import AsyncSessionLocal  # Наша фабрика сессий
 from src.logger import logger
+from src.middlewares.db import DbSessionMiddleware
 from src.notifier import Notifier
 from src.sheets import sheets_client
 
@@ -14,16 +18,27 @@ class PainBot:
     def __init__(self):
         self.bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
         self.dp = Dispatcher()
+
+        # Регистрируем Middleware для всех обновлений (messages, callback_query и т.д.)
+        self.dp.update.middleware(DbSessionMiddleware(session_pool=AsyncSessionLocal))
+
         self.notifier = Notifier(self.bot)
         self._register_handlers()
     
     def _register_handlers(self):
         @self.dp.message(Command("start"))
-        async def cmd_start(message: Message):
-            # TODO: приветствие
+        async def cmd_start(message: Message, session: AsyncSession):
             try:
+                # Регистрируем или получаем пользователя из базы
+                user = await get_or_create_user(
+                    session=session,
+                    telegram_id=message.from_user.id,
+                    first_name=message.from_user.first_name,
+                    last_name=message.from_user.last_name,
+                    username=message.from_user.username,
+                )
                 await message.answer(
-                    text=f"Привет, {message.from_user.first_name}!"
+                    text=f"Привет, {user.first_name}!"
                 )
                 logger.info(
                     f"Поприветствовали пользователя {message.from_user.id}"
@@ -36,8 +51,8 @@ class PainBot:
                 )
             
         @self.dp.message(Command("pain"))
-        async def cmd_pain(message: Message):
-            # TODO: основная логика
+        async def cmd_pain(message: Message, session: AsyncSession):
+            
 
             if message.from_user.id != config.ADMIN_USER_ID:
                 await message.answer(
@@ -49,8 +64,25 @@ class PainBot:
                 return
             else:
                 try:
+                    # 1. Получаем или создаем пользователя в БД
+                    user = await get_or_create_user(
+                        session=session,
+                        telegram_id=message.from_user.id,
+                        first_name=message.from_user.first_name,
+                        last_name=message.from_user.last_name,
+                        username=message.from_user.username,
+                    )
                     today_date = datetime.now()
                     date_str = today_date.strftime("%d.%m.%Y")
+
+                    # 2. Сохраняем/обновляем запись о боли в PostgreSQL
+                    record = await add_headache_record(
+                        session=session,
+                        user_id=user.id,  # Внутренний ID пользователя из таблицы users
+                        pain_date=today_date,
+                        is_pain=True,
+                    )
+
                     row = sheets_client.find_row_by_date(today_date)
 
                     if not row:
