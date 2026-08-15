@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     CHECK_INTERVAL: int = Field(60, ge=10, le=3600)
     LOG_LEVEL: str = "INFO"
 
+    # PostgreSQL
+    DB_USER: str = Field(..., min_length=1)
+    DB_PASSWORD: str = Field(..., min_length=1)
+    DB_HOST: str = Field("localhost", min_length=1)
+    DB_PORT: str = Field("5432", min_length=1)
+    DB_NAME: str = Field(..., min_length=1)
+
+    @property
+    def DATABASE_URL(self) -> str:
+        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
