@@ -7,4 +7,5 @@ python-dotenv==1.2.1
 
 psycopg2-binary==2.9.12   # PostgreSQL драйвер
 sqlalchemy==2.0.51        # ORM для работы с базой данных
+
 alembic==1.19.1           # Миграция бд
