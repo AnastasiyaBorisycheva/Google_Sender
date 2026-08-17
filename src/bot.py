@@ -8,10 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import config
 from src.database.crud import add_headache_record, get_or_create_user
 from src.database.engine import AsyncSessionLocal  # Наша фабрика сессий
-from src.logger import logger
+from src.logger import setup_logger
 from src.middlewares.db import DbSessionMiddleware
 from src.notifier import Notifier
 from src.sheets import sheets_client
+
+logger = setup_logger(name=__name__, log_file='debug.log')
 
 
 class PainBot:

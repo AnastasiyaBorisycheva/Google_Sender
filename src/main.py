@@ -3,22 +3,15 @@
 """
 
 import asyncio
-import logging
 import sys
 
 from src.config import config
 from src.sheets import sheets_client
 from src.bot import PainBot
+from src.logger import setup_logger
 
 
-# Настройка логирования
-logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-
-logger = logging.getLogger(__name__)
+logger = setup_logger(name=__name__, log_file='debug.log')
 
 
 async def main():

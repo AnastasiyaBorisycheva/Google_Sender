@@ -1,16 +1,26 @@
 """
 Асинхронный клиент для работы с Google Sheets
 """
+import asyncio
+from datetime import datetime
+from typing import Optional, Tuple
 
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
-from typing import Optional, Tuple
 from gspread.utils import column_letter_to_index
-from src.logger import logger
+from gspread_asyncio import AsyncioGspreadClientManager
 
 from src.config import config
+from src.logger import setup_logger
 from src.models import PainRecord
+
+logger = setup_logger(name=__name__, log_file='debug.log')
+
+def get_creds():
+    return Credentials.from_service_account_file(
+        config.GOOGLE_SHEETS_CREDENTIALS,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    )
 
 
 class SheetsError(Exception):
@@ -20,7 +30,7 @@ class SheetsError(Exception):
 
 
 class SheetsClient:
-    def __init__(self):
+    def __init__(self, client=None, spreadsheet=None, worksheet=None):
         self.client: Optional[gspread.Client] = None
         self.spreadsheet = None
         self.worksheet = None
@@ -156,12 +166,51 @@ class SheetsClient:
 
         return result
 
+class AsyncSheetsClient:
+    def __init__(
+            self,
+            spreadsheet_id: Optional[str] = None,
+            sheet_name: Optional[str] = None
+        ):
+        self.spreadsheet_id = spreadsheet_id or config.SPREADSHEET_ID
+        self.sheet_name = sheet_name or config.SHEET_NAME
+        self.client = None
+        self.spreadsheet = None
+        self.worksheet = None
+
+    async def initialize(self) -> None:
+        try:
+            client_manager = AsyncioGspreadClientManager(get_creds)
+            self.client = await client_manager.authorize()
+
+            self.spreadsheet = await self.client.open_by_key(self.spreadsheet_id)
+            self.worksheet = await self.spreadsheet.worksheet(self.sheet_name)
+
+            logger.info("Подключение установлено")
+            logger.info(f"Подключились к таблице: {self.spreadsheet}")
+            logger.info(f"Подключились к листу: {self.sheet_name}")
+
+        except Exception as e:
+            error_msg = f"Ошибка подключения: {type(e).__name__}: {e}"
+            logger.error(error_msg)
+            raise SheetsError(error_msg) from e
+
 
 # Глобальный экземпляр
-sheets_client = SheetsClient()
+# sheets_client = SheetsClient()
+async_sheet_client = AsyncSheetsClient(
+    spreadsheet_id='18G0PQZp0z1Cw0XkBFvjXB3YXCOmeMmWHzoVcLvbdV3k',
+    sheet_name='2025'
+)
 
+async def main():
+    await async_sheet_client.initialize()
 
 if __name__ == "__main__":
-    sheets_client.initialize()
-    test_date = datetime.strptime("2026-04-17", "%Y-%m-%d")
-    sheets_client.find_row_by_date(test_date)
+
+    asyncio.run(main())
+
+    # sheets_client.initialize()
+    # test_date = datetime.strptime("2026-04-17", "%Y-%m-%d")
+    # sheets_client.find_row_by_date(test_date)
+    
