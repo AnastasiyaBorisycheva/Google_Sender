@@ -3,7 +3,7 @@
 """
 
 import json
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, model_validator
 
@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     # Google Sheets
     GOOGLE_SHEETS_CREDENTIALS: str = "credentials.json"
     SPREADSHEET_ID: str = Field(..., min_length=5)
-    SHEET_NAME: str = "2026"
+    SHEET_NAME: Optional[str] = None
     MONITOR_CELL: str = "C1"
+    MEDICATION: str = "Золмитриптан 2.5"
 
     # Столбцы
     DATE_COLUMN: str = "B"

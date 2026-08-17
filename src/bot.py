@@ -11,7 +11,7 @@ from src.database.engine import AsyncSessionLocal  # Наша фабрика с�
 from src.logger import setup_logger
 from src.middlewares.db import DbSessionMiddleware
 from src.notifier import Notifier
-from src.sheets import sheets_client
+from src.sheets import sheets_client, async_sheet_client
 
 logger = setup_logger(name=__name__, log_file='debug.log')
 
@@ -85,7 +85,7 @@ class PainBot:
                         is_pain=True,
                     )
 
-                    row = sheets_client.find_row_by_date(today_date)
+                    row = await async_sheet_client.find_row_by_date(today_date)
 
                     if not row:
                         await message.answer(
@@ -93,14 +93,14 @@ class PainBot:
                         )
                         return
 
-                    pain_info = sheets_client.get_record_at_row(row=row)
+                    pain_info = await async_sheet_client.get_record_at_row(row=row)
                     if pain_info.pain_level:
                         await message.answer(
                             "На сегодня уже есть запись о боли"
                         )
                         return
 
-                    sheets_client.write_pain_record(row=row)
+                    await async_sheet_client.write_pain_record(row=row)
                     msg_text = self.notifier.format_pain_notification(
                         today_date.strftime("%d.%m.%Y")
                     )

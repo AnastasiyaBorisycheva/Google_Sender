@@ -168,16 +168,33 @@ class SheetsClient:
         return result
 
 class AsyncSheetsClient:
+
     def __init__(
             self,
             spreadsheet_id: Optional[str] = None,
-            sheet_name: Optional[str] = None
+            sheet_name: Optional[str] = None,
+            date_col: Optional[str] = None,
+            pain_col: Optional[str] = None,
+            medicine_col: Optional[str] = None,
         ):
         self.spreadsheet_id = spreadsheet_id or config.SPREADSHEET_ID
-        self.sheet_name = sheet_name or config.SHEET_NAME
+
+        # Если sheet_name не передан явно — оставляем None, чтобы открыть первый вкладку
+        self.sheet_name = sheet_name
+
         self.client = None
         self.spreadsheet = None
         self.worksheet = None
+
+        # Если передано кастомное значение — берём его, иначе из config
+        self.date_col = date_col or config.DATE_COLUMN
+        self.pain_col = pain_col or config.PAIN_COLUMN
+        self.medicine_col = medicine_col or config.MEDICATION_COLUMN
+
+        # 1-based индексы (идеально для update_cell в gspread)
+        self.col_date_idx = column_letter_to_index(self.date_col)
+        self.col_pain_idx = column_letter_to_index(self.pain_col)
+        self.col_med_idx = column_letter_to_index(self.medicine_col)
 
     async def initialize(self) -> None:
         """Инициализация подключения"""
@@ -185,9 +202,18 @@ class AsyncSheetsClient:
         try:
             client_manager = AsyncioGspreadClientManager(get_creds)
             self.client = await client_manager.authorize()
-
             self.spreadsheet = await self.client.open_by_key(self.spreadsheet_id)
-            self.worksheet = await self.spreadsheet.worksheet(self.sheet_name)
+            
+            # Выбираем рабочий лист
+            if self.sheet_name:
+                # Если имя явно указано — ищем по имени
+                self.worksheet = await self.spreadsheet.worksheet(self.sheet_name)
+            else:
+                # Если имя не указано — берем самый первый лист (индекс 0)
+                self.worksheet = await self.spreadsheet.get_worksheet(0)
+                self.sheet_name = self.worksheet.title  # сохраняем реальное имя первого листа
+
+            
 
             logger.info("Подключение установлено")
             logger.info(f"Подключились к таблице: {self.spreadsheet.title}")
@@ -201,18 +227,15 @@ class AsyncSheetsClient:
     async def find_row_by_date(
             self,
             date: datetime,
-            letter: str = config.DATE_COLUMN
+            letter: Optional[str] = None
         ) -> Optional[int]:
         """
-            Находит номер строки, в которой в столбце DATE_COLUMN
-            находится указанная дата.
-            Формат даты в таблице: dd.mm.yyyy (например, "16.04.2026")
-            Returns:
-                Номер строки (1, 2, 3...) или None если не найдена
+        Находит номер строки, в которой находится указанная дата.
+        Если letter не передан, использует столбец даты по умолчанию (self.col_date_idx).
         """
 
         # 1. Преобразовываем переданную букву в числовое представление
-        col_idx = column_letter_to_index(letter)
+        col_idx = column_letter_to_index(letter) if letter else self.col_date_idx
 
         # 2. Преобразовываем дату в строку формата dd.mm.yyyy
         str_date = datetime.strftime(date, "%d.%m.%Y")
@@ -233,19 +256,16 @@ class AsyncSheetsClient:
         Получает запись из указанной строки (для мониторинга изменений)
         """
 
-        col_data_idx = column_letter_to_index(config.DATE_COLUMN) - 1
-        col_pain_idx = column_letter_to_index(config.PAIN_COLUMN) - 1
-        col_med_idx = column_letter_to_index(config.MEDICATION_COLUMN) - 1
-
         try:
             row_data = await self.worksheet.row_values(row)
+
             # Безопасное получение элемента из списка по индексу
             def get_val(idx: int) -> str:
                 return row_data[idx].strip() if idx < len(row_data) else ""
 
-            data_info = get_val(col_data_idx)
-            pain_info = get_val(col_pain_idx)
-            medicine_info = get_val(col_med_idx)
+            data_info = get_val(self.col_date_idx-1)
+            pain_info = get_val(self.col_pain_idx-1)
+            medicine_info = get_val(self.col_med_idx-1)
 
             # Парсим дату
             data_info_as_date = (
@@ -271,20 +291,46 @@ class AsyncSheetsClient:
             logger.error(f"Непредвиденная ошибка при чтении строки {row}: {e}")
             return None
 
+    async def write_pain_record(
+        self,
+        row: int,
+        pain_value: int = 1,
+        medication: Optional[str] = None
+    ) -> bool:
+        """
+        Записывает значение боли и (опционально) медикамент в указанную строку.
+        """
+        try:
+            # Записываем факт боли
+            await self.worksheet.update_cell(row, self.col_pain_idx, pain_value)
+
+            # Если передано лекарство — записываем его
+            med = medication if medication else config.MEDICATION
+            await self.worksheet.update_cell(row, self.col_med_idx, med)
+
+            logger.info(f"Успешно записано в строку {row}: боль={pain_value}, лекарство={med}")
+            return True
+
+        except APIError as e:
+            logger.error(f"Ошибка API при записи в строку {row}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Непредвиденная ошибка при записи в строку {row}: {e}")
+            return False
+
+
 
 # Глобальный экземпляр
-# sheets_client = SheetsClient()
-async_sheet_client = AsyncSheetsClient(
-    spreadsheet_id='18G0PQZp0z1Cw0XkBFvjXB3YXCOmeMmWHzoVcLvbdV3k',
-    sheet_name='2025'
-)
+sheets_client = SheetsClient()
+
+async_sheet_client = AsyncSheetsClient()
 
 async def main():
     await async_sheet_client.initialize()
     test_date = datetime.strptime("2025-01-16", "%Y-%m-%d")
-    result_cell = await async_sheet_client.find_row_by_date(test_date)
-    line_record = await async_sheet_client.get_record_at_row(result_cell)
-    print(line_record)
+    # result = await async_sheet_client.find_row_by_date(date=test_date, letter='B')
+    # result = await async_sheet_client.write_pain_record(369, 1, 'тест')
+    # print(result)
 
 if __name__ == "__main__":
 
