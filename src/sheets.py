@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 import gspread
 from google.oauth2.service_account import Credentials
+from gspread.exceptions import APIError
 from gspread.utils import column_letter_to_index
 from gspread_asyncio import AsyncioGspreadClientManager
 
@@ -179,6 +180,8 @@ class AsyncSheetsClient:
         self.worksheet = None
 
     async def initialize(self) -> None:
+        """Инициализация подключения"""
+
         try:
             client_manager = AsyncioGspreadClientManager(get_creds)
             self.client = await client_manager.authorize()
@@ -187,13 +190,86 @@ class AsyncSheetsClient:
             self.worksheet = await self.spreadsheet.worksheet(self.sheet_name)
 
             logger.info("Подключение установлено")
-            logger.info(f"Подключились к таблице: {self.spreadsheet}")
+            logger.info(f"Подключились к таблице: {self.spreadsheet.title}")
             logger.info(f"Подключились к листу: {self.sheet_name}")
 
         except Exception as e:
             error_msg = f"Ошибка подключения: {type(e).__name__}: {e}"
             logger.error(error_msg)
             raise SheetsError(error_msg) from e
+
+    async def find_row_by_date(
+            self,
+            date: datetime,
+            letter: str = config.DATE_COLUMN
+        ) -> Optional[int]:
+        """
+            Находит номер строки, в которой в столбце DATE_COLUMN
+            находится указанная дата.
+            Формат даты в таблице: dd.mm.yyyy (например, "16.04.2026")
+            Returns:
+                Номер строки (1, 2, 3...) или None если не найдена
+        """
+
+        # 1. Преобразовываем переданную букву в числовое представление
+        col_idx = column_letter_to_index(letter)
+
+        # 2. Преобразовываем дату в строку формата dd.mm.yyyy
+        str_date = datetime.strftime(date, "%d.%m.%Y")
+
+        # 3. Находим все даты в столбце
+        try:
+            cell = await self.worksheet.find(str_date, in_column=col_idx)
+            return cell.row if cell else None
+        except APIError as e:
+            logger.warning(f"Ошибка API при поиске даты {str_date}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Непредвиденная ошибка при поиске даты: {e}")
+            return None
+
+    async def get_record_at_row(self, row: int) -> Optional[PainRecord]:
+        """
+        Получает запись из указанной строки (для мониторинга изменений)
+        """
+
+        col_data_idx = column_letter_to_index(config.DATE_COLUMN) - 1
+        col_pain_idx = column_letter_to_index(config.PAIN_COLUMN) - 1
+        col_med_idx = column_letter_to_index(config.MEDICATION_COLUMN) - 1
+
+        try:
+            row_data = await self.worksheet.row_values(row)
+            # Безопасное получение элемента из списка по индексу
+            def get_val(idx: int) -> str:
+                return row_data[idx].strip() if idx < len(row_data) else ""
+
+            data_info = get_val(col_data_idx)
+            pain_info = get_val(col_pain_idx)
+            medicine_info = get_val(col_med_idx)
+
+            # Парсим дату
+            data_info_as_date = (
+                datetime.strptime(data_info, "%d.%m.%Y") if data_info else None
+            )
+
+            # Безопасное приведение боли к int (1 или None)
+            pain_level = int(pain_info) if pain_info.isdigit() else None
+
+            # Медикамент (возвращаем None, если строка пустая)
+            medication = medicine_info if medicine_info else None
+
+            return PainRecord(
+                date=data_info_as_date,
+                row=row,
+                pain_level=pain_level,
+                medication=medication
+            )
+        except APIError as e:
+            logger.warning(f"Ошибка API при чтении строки {row}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Непредвиденная ошибка при чтении строки {row}: {e}")
+            return None
 
 
 # Глобальный экземпляр
@@ -205,10 +281,14 @@ async_sheet_client = AsyncSheetsClient(
 
 async def main():
     await async_sheet_client.initialize()
+    test_date = datetime.strptime("2025-01-16", "%Y-%m-%d")
+    result_cell = await async_sheet_client.find_row_by_date(test_date)
+    line_record = await async_sheet_client.get_record_at_row(result_cell)
+    print(line_record)
 
 if __name__ == "__main__":
 
-    asyncio.run(main())
+    asyncio.run(main(), debug=True)
 
     # sheets_client.initialize()
     # test_date = datetime.strptime("2026-04-17", "%Y-%m-%d")
