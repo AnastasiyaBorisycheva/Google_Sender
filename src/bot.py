@@ -11,7 +11,7 @@ from src.database.engine import AsyncSessionLocal  # Наша фабрика с�
 from src.logger import setup_logger
 from src.middlewares.db import DbSessionMiddleware
 from src.notifier import Notifier
-from src.sheets import sheets_client, async_sheet_client
+from src.sheets import async_sheet_client
 
 logger = setup_logger(name=__name__, log_file='debug.log')
 
@@ -83,6 +83,7 @@ class PainBot:
                         user_id=user.id,  # Внутренний ID пользователя из таблицы users
                         pain_date=today_date,
                         is_pain=True,
+                        medicine=config.MEDICATION
                     )
 
                     row = await async_sheet_client.find_row_by_date(today_date)

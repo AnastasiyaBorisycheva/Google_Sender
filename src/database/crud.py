@@ -19,14 +19,21 @@ async def get_or_create_user(
     user = result.scalar_one_or_none()
 
     if user:
-        if (
-            user.username != username
-            or user.first_name != first_name
-            or user.last_name != last_name
-        ):
-            user.username = username
+        updated = False
+
+        if first_name is not None and user.first_name != first_name:
             user.first_name = first_name
+            updated = True
+
+        if last_name is not None and user.last_name != last_name:
             user.last_name = last_name
+            updated = True
+
+        if username is not None and user.username != username:
+            user.username = username
+            updated = True
+
+        if updated:
             await session.commit()
 
     else:

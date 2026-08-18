@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     SPREADSHEET_ID: str = Field(..., min_length=5)
     SHEET_NAME: Optional[str] = None
     MONITOR_CELL: str = "C1"
-    MEDICATION: str = "Золмитриптан 2.5"
+    MEDICATION: str = "золмитриптан 2.5"
 
     # Столбцы
     DATE_COLUMN: str = "B"

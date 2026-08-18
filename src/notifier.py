@@ -1,6 +1,8 @@
 from aiogram import Bot
 from src.config import config
-from src.logger import logger
+from src.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 class Notifier:

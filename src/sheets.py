@@ -321,7 +321,7 @@ class AsyncSheetsClient:
 
 
 # Глобальный экземпляр
-sheets_client = SheetsClient()
+# sheets_client = SheetsClient()
 
 async_sheet_client = AsyncSheetsClient()
 

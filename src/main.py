@@ -6,7 +6,7 @@ import asyncio
 import sys
 
 from src.config import config
-from src.sheets import sheets_client, async_sheet_client
+from src.sheets import async_sheet_client
 from src.bot import PainBot
 from src.logger import setup_logger
 
@@ -27,7 +27,6 @@ async def main():
 
     # 1. Инициализация Google Sheets (один раз при старте)
     logger.info("Инициализация Google Sheets...")
-    sheets_client.initialize()
     await async_sheet_client.initialize()
     logger.info("Google Sheets готов")
 
