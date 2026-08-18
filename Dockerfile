@@ -8,7 +8,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем код
-COPY src/ ./src/
+COPY . .
+
+# Делаем скрипт запуска исполняемым
+RUN chmod +x /app/entrypoint.sh 2>/dev/null || true
 
 # Запуск
 CMD ["python", "-m", "src.main"]

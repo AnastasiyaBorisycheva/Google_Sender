@@ -1,11 +1,33 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: headache-diary-db
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $DB_USER -d $DB_NAME"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   bot:
     build: .
     container_name: headache-diary-bot
     restart: always
-    volumes:
-      - ./storage:/app/storage  # сохраняем state.json между перезапусками
     env_file:
       - .env
+    entrypoint: ["/app/entrypoint.sh"]
+    command: ["python", "-m", "src.main"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
